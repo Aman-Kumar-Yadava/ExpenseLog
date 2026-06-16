@@ -11,5 +11,6 @@ data class Expense(
     val amount: Double,
     val quantity: Double? = null,
     val unit: String? = null,
-    val notes: String? = null
+    val notes: String? = null,
+    val folderId: Int = 0 // Required now
 )

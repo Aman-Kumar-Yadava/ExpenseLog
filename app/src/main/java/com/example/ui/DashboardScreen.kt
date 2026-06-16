@@ -1,13 +1,12 @@
 package com.example.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,62 +18,108 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.example.data.Expense
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
-
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Share
-import android.content.Intent
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 
+fun getIconByName(name: String) = when(name) {
+    "ShoppingCart" -> Icons.Default.ShoppingCart
+    "Home" -> Icons.Default.Home
+    "DirectionsCar" -> Icons.Default.DirectionsCar
+    "Flight" -> Icons.Default.Flight
+    "LocalHospital" -> Icons.Default.LocalHospital
+    "School" -> Icons.Default.School
+    "Business" -> Icons.Default.Business
+    "Person" -> Icons.Default.Person
+    else -> Icons.Default.Folder
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun DashboardScreen(navController: NavController, viewModel: ExpenseViewModel) {
+fun DashboardScreen(
+    navController: NavController, 
+    viewModel: ExpenseViewModel,
+    currentThemeIndex: Int = 0,
+    onThemeChange: (Int) -> Unit = {}
+) {
+    val folders by viewModel.allFolders.collectAsStateWithLifecycle()
     val expenses by viewModel.allExpenses.collectAsStateWithLifecycle()
     val todayTotal by viewModel.todayTotal.collectAsStateWithLifecycle()
     val monthTotal by viewModel.monthTotal.collectAsStateWithLifecycle()
     val totalExpenses by viewModel.totalExpenses.collectAsStateWithLifecycle()
     
     var selectedExpenseIds by remember { mutableStateOf(setOf<Int>()) }
-    var expenseToView by remember { mutableStateOf<Expense?>(null) }
+    var expenseToView by remember { mutableStateOf<com.example.data.Expense?>(null) }
     var showLanguageDialog by remember { mutableStateOf(false) }
-    var expensesToExport by remember { mutableStateOf<List<Expense>?>(null) }
+    var expensesToExport by remember { mutableStateOf<List<com.example.data.Expense>?>(null) }
+    var selectedFolderId by remember { mutableStateOf<Int?>(null) }
+    var isExporting by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    
     val context = LocalContext.current
 
     if (showLanguageDialog && expensesToExport != null) {
         AlertDialog(
             onDismissRequest = { 
-                showLanguageDialog = false 
-                expensesToExport = null
+                if (!isExporting) {
+                    showLanguageDialog = false 
+                    expensesToExport = null
+                }
             },
             title = { Text("Export to PDF") },
-            text = { Text("Choose the language for the PDF report:") },
+            text = { 
+                if (isExporting) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        Text("Translating & Generating PDF...")
+                    }
+                } else {
+                    Text("Choose the language for the PDF report:") 
+                }
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    exportToPdf(context, expensesToExport!!, "hi")
-                    showLanguageDialog = false
-                    selectedExpenseIds = emptySet()
-                    expensesToExport = null
-                }) {
+                TextButton(
+                    onClick = {
+                        if (!isExporting) {
+                            isExporting = true
+                            scope.launch {
+                                exportToPdf(context, expensesToExport!!, "hi")
+                                isExporting = false
+                                showLanguageDialog = false
+                                selectedExpenseIds = emptySet()
+                                expensesToExport = null
+                            }
+                        }
+                    },
+                    enabled = !isExporting
+                ) {
                     Text("Hindi")
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    exportToPdf(context, expensesToExport!!, "en")
-                    showLanguageDialog = false
-                    selectedExpenseIds = emptySet()
-                    expensesToExport = null
-                }) {
+                TextButton(
+                    onClick = {
+                        if (!isExporting) {
+                            isExporting = true
+                            scope.launch {
+                                exportToPdf(context, expensesToExport!!, "en")
+                                isExporting = false
+                                showLanguageDialog = false
+                                selectedExpenseIds = emptySet()
+                                expensesToExport = null
+                            }
+                        }
+                    },
+                    enabled = !isExporting
+                ) {
                     Text("English")
                 }
             }
@@ -140,12 +185,12 @@ fun DashboardScreen(navController: NavController, viewModel: ExpenseViewModel) {
                             val text = selectedExpenses.joinToString(separator = "\n\n") {
                                 "Expense: ${it.reason}\nAmount: ₹${it.amount}\nDate: ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(it.date))}"
                             }
-                            val sendIntent: Intent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, text)
+                            val sendIntent: android.content.Intent = android.content.Intent().apply {
+                                action = android.content.Intent.ACTION_SEND
+                                putExtra(android.content.Intent.EXTRA_TEXT, text)
                                 type = "text/plain"
                             }
-                            context.startActivity(Intent.createChooser(sendIntent, "Share Expense Logs"))
+                            context.startActivity(android.content.Intent.createChooser(sendIntent, "Share Expense Logs"))
                         }) {
                             Icon(Icons.Default.Share, contentDescription = "Share text")
                         }
@@ -174,87 +219,170 @@ fun DashboardScreen(navController: NavController, viewModel: ExpenseViewModel) {
                             Text("DASHBOARD", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 2.sp)
                         }
                     },
-                    actions = {
-                        IconButton(onClick = { navController.navigate("reports") }) {
-                            Icon(Icons.Default.BarChart, contentDescription = "Reports")
+                actions = {
+                    var isThemeMenuExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { isThemeMenuExpanded = true }) {
+                            Icon(Icons.Default.Palette, contentDescription = "Themes")
                         }
-                        IconButton(onClick = { 
-                            expensesToExport = expenses
-                            showLanguageDialog = true 
-                        }) {
-                            Icon(Icons.Default.PictureAsPdf, contentDescription = "Export PDF")
+                        DropdownMenu(
+                            expanded = isThemeMenuExpanded,
+                            onDismissRequest = { isThemeMenuExpanded = false }
+                        ) {
+                            val themeNames = listOf("Purple (Default)", "Green", "Blue", "Orange", "Rose")
+                            themeNames.forEachIndexed { index, name ->
+                                DropdownMenuItem(
+                                    text = { Text(name) },
+                                    onClick = { 
+                                        onThemeChange(index)
+                                        isThemeMenuExpanded = false
+                                    },
+                                    trailingIcon = if (currentThemeIndex == index) {
+                                        { Icon(Icons.Default.Check, contentDescription = "Selected") }
+                                    } else null
+                                )
+                            }
                         }
                     }
-                )
-            }
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { navController.navigate("add_expense") },
-                icon = { Icon(Icons.Default.Add, contentDescription = "Add Expense") },
-                text = { Text("Add Expense", fontWeight = FontWeight.Bold) },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
-                modifier = Modifier.padding(16.dp)
+                    IconButton(onClick = { navController.navigate("reports") }) {
+                        Icon(Icons.Default.BarChart, contentDescription = "Reports")
+                    }
+                    IconButton(onClick = { navController.navigate("create_folder") }) {
+                        Icon(Icons.Default.CreateNewFolder, contentDescription = "Create Folder")
+                    }
+                }
             )
+            }
         }
     ) { padding ->
-        LazyColumn(
+        androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+            columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(minSize = 150.dp),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item { Spacer(modifier = Modifier.height(4.dp)) }
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { Spacer(modifier = Modifier.height(4.dp)) }
             
-            item {
-                TodaySummaryCard(todayTotal)
-            }
-            item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    MiniSummaryCard(title = "This Month", amount = monthTotal, modifier = Modifier.weight(1f))
-                    MiniSummaryCard(title = "Total All Time", amount = totalExpenses, modifier = Modifier.weight(1f))
-                }
-            }
-            
-            item {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Recent Activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text("View all", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+                    Text("DIRECTORIES & DRAWERS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
                 }
             }
             
-            items(expenses.take(20)) { expense ->
-                val isSelected = selectedExpenseIds.contains(expense.id)
-                ExpenseItem(
-                    expense = expense,
-                    isSelected = isSelected,
-                    onClick = {
-                        if (selectedExpenseIds.isNotEmpty()) {
-                            if (isSelected) {
-                                selectedExpenseIds = selectedExpenseIds - expense.id
-                            } else {
-                                selectedExpenseIds = selectedExpenseIds + expense.id
-                            }
-                        } else {
-                            expenseToView = expense
-                        }
-                    },
-                    onLongClick = {
-                        if (!isSelected) {
-                            selectedExpenseIds = selectedExpenseIds + expense.id
-                        }
+            if (folders.isEmpty()) {
+                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.Folder,
+                            contentDescription = "No folders",
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "No folders yet",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Create a custom folder to organize your expenses.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
+                }
+            } else {
+                items(folders, key = { it.id }) { folder ->
+                    val folderExpenses = expenses.filter { it.folderId == folder.id }
+                    val totalAmount = folderExpenses.sumOf { it.amount }
+                    val count = folderExpenses.size
+                    
+                    FolderNotesAppCard(
+                        folder = folder,
+                        expenseCount = count,
+                        totalAmount = totalAmount,
+                        onClick = { navController.navigate("folder_detail?folderId=${folder.id}") }
+                    )
+                }
+            }
+
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) { Spacer(modifier = Modifier.height(80.dp)) }
+        }
+    }
+}
+
+@Composable
+fun FolderNotesAppCard(
+    folder: com.example.data.Folder,
+    expenseCount: Int,
+    totalAmount: Double,
+    onClick: () -> Unit
+) {
+    val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+    format.maximumFractionDigits = 0
+
+    Card(
+        modifier = Modifier.fillMaxWidth().aspectRatio(1.2f).clickable { onClick() },
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp).fillMaxSize()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    imageVector = getIconByName(folder.iconName),
+                    contentDescription = folder.name,
+                    tint = Color(folder.color),
+                    modifier = Modifier.size(36.dp)
+                )
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = "Options",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = folder.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                 Text(
+                    text = "$expenseCount items",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                 Text(
+                    text = format.format(totalAmount),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
@@ -307,77 +435,3 @@ fun MiniSummaryCard(title: String, amount: Double, modifier: Modifier = Modifier
     }
 }
 
-@Composable
-fun SummaryCard(title: String, amount: Double, isCount: Boolean = false, modifier: Modifier = Modifier) {
-    val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            val displayText = if (isCount) amount.toInt().toString() else format.format(amount)
-            Text(text = displayText, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun ExpenseItem(
-    expense: Expense,
-    isSelected: Boolean = false,
-    onClick: () -> Unit = {},
-    onLongClick: () -> Unit = {}
-) {
-    val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-    val dateFormat = SimpleDateFormat("dd MMM • hh:mm a", Locale.getDefault())
-    
-    val containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-    
-    Card(
-        modifier = Modifier.fillMaxWidth(), 
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Row(
-            modifier = Modifier
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = onLongClick
-                )
-                .padding(16.dp), 
-            verticalAlignment = Alignment.CenterVertically, 
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            val initial = expense.reason.firstOrNull()?.uppercase() ?: "E"
-            val colors = listOf(
-                Color(0xFFFFDAD6) to Color(0xFF410002), // Redish
-                Color(0xFFD3E4FF) to Color(0xFF001D36), // Blueish
-                Color(0xFFE8DEF8) to Color(0xFF1D192B)  // Purpleish
-            )
-            val colorPair = colors[expense.reason.length % colors.size]
-            
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(colorPair.first, androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = initial, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colorPair.second)
-            }
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = expense.reason, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                    Text(text = "-${format.format(expense.amount)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFFDC2626))
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    val qtyText = if (expense.quantity != null && expense.unit != null) "${expense.quantity} ${expense.unit}" else "1 Item"
-                    Text(text = qtyText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(text = dateFormat.format(Date(expense.date)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-    }
-}

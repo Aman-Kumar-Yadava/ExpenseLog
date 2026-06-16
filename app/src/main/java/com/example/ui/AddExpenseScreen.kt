@@ -6,7 +6,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -15,17 +14,19 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.data.Expense
-import kotlinx.coroutines.launch
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddExpenseScreen(navController: NavController, viewModel: ExpenseViewModel, expenseId: Int = -1) {
+fun AddExpenseScreen(navController: NavController, viewModel: ExpenseViewModel, expenseId: Int = -1, folderId: Int = -1) {
     val expenses by viewModel.allExpenses.collectAsStateWithLifecycle()
+    val folders by viewModel.allFolders.collectAsStateWithLifecycle()
+    
     val isEditMode = expenseId != -1
     val existingExpense = remember(expenseId, expenses) {
         expenses.find { it.id == expenseId }
     }
+
+    val selectedFolderId = existingExpense?.folderId ?: folderId
 
     var reason by remember(existingExpense) { mutableStateOf(existingExpense?.reason ?: "") }
     var amount by remember(existingExpense) { mutableStateOf(existingExpense?.amount?.toString() ?: "") }
@@ -57,6 +58,7 @@ fun AddExpenseScreen(navController: NavController, viewModel: ExpenseViewModel, 
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            
             OutlinedTextField(
                 value = reason,
                 onValueChange = { reason = it },
@@ -126,7 +128,7 @@ fun AddExpenseScreen(navController: NavController, viewModel: ExpenseViewModel, 
             
             Button(
                 onClick = {
-                    if (isSaving) return@Button
+                    if (isSaving || selectedFolderId <= 0) return@Button
                     val amountValue = amount.toDoubleOrNull()
                     if (reason.isNotBlank() && amountValue != null) {
                         isSaving = true
@@ -137,7 +139,8 @@ fun AddExpenseScreen(navController: NavController, viewModel: ExpenseViewModel, 
                             amount = amountValue,
                             quantity = quantity.toDoubleOrNull(),
                             unit = unit.takeIf { it.isNotBlank() },
-                            notes = notes.takeIf { it.isNotBlank() }
+                            notes = notes.takeIf { it.isNotBlank() },
+                            folderId = selectedFolderId
                         )
                         if (isEditMode) {
                             viewModel.updateExpense(newExpense)
@@ -148,7 +151,7 @@ fun AddExpenseScreen(navController: NavController, viewModel: ExpenseViewModel, 
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
-                enabled = !isSaving && reason.isNotBlank() && amount.toDoubleOrNull() != null
+                enabled = !isSaving && reason.isNotBlank() && amount.toDoubleOrNull() != null && selectedFolderId > 0
             ) {
                 Text("Save Expense")
             }

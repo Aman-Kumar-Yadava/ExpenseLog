@@ -10,6 +10,9 @@ interface ExpenseDao {
     @Query("SELECT * FROM expenses ORDER BY date DESC")
     fun getAllExpenses(): Flow<List<Expense>>
 
+    @Query("SELECT * FROM expenses WHERE folderId = :folderId ORDER BY date DESC")
+    fun getExpensesByFolder(folderId: Int): Flow<List<Expense>>
+
     @Insert
     suspend fun insertExpense(expense: Expense)
 

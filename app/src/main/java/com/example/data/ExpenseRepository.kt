@@ -9,6 +9,10 @@ class ExpenseRepository(private val expenseDao: ExpenseDao) {
         return expenseDao.getExpensesBetweenDates(startDate, endDate)
     }
 
+    fun getExpensesByFolder(folderId: Int): Flow<List<Expense>> {
+        return expenseDao.getExpensesByFolder(folderId)
+    }
+
     suspend fun insertExpense(expense: Expense) {
         expenseDao.insertExpense(expense)
     }
