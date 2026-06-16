@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Clean, simple premium wallet line-art / filled shape -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M73.5,33.5h-39C29.8,33.5 26,37.3 26,42v24c0,4.7 3.8,8.5 8.5,8.5h39c4.7,0 8.5,-3.8 8.5,-8.5V42C82,37.3 78.2,33.5 73.5,33.5zM71,59H63c-3.3,0 -6,-2.7 -6,-6s2.7,-6 6,-6h8V59zM63.5,50.5c-1.4,0 -2.5,1.1 -2.5,2.5s1.1,2.5 2.5,2.5s2.5,-1.1 2.5,-2.5S64.9,50.5 63.5,50.5z" />
+
+    <!-- A few ambient minimalist star/sparkles around -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M39,24l2,6l6,2l-6,2l-2,6l-2,-6l-6,-2l6,-2z" />
+        
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M74,70l1.5,4.5l4.5,1.5l-4.5,1.5l-1.5,4.5l-1.5,-4.5l-4.5,-1.5l4.5,-1.5z" />
+</vector>
