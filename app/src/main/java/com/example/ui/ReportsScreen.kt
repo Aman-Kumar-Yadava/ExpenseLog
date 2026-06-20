@@ -172,7 +172,7 @@ fun SummaryCard(title: String, amount: Double, isCount: Boolean = false, modifie
 @Composable
 fun BarChart(expenses: List<Expense>) {
     val color = MaterialTheme.colorScheme.primary
-    Canvas(modifier = Modifier.fillMaxWidth().height(200.dp)) {
+    Canvas(modifier = Modifier.fillMaxWidth().height(200.dp).padding(top = 16.dp)) {
         if (expenses.isEmpty()) return@Canvas
         val maxAmount = expenses.maxOf { it.amount }.toFloat().coerceAtLeast(1f)
         val barWidth = size.width / (expenses.size * 2)
@@ -194,10 +194,10 @@ fun BarChart(expenses: List<Expense>) {
 @Composable
 fun LineChart(expenses: List<Expense>) {
     val color = MaterialTheme.colorScheme.secondary
-    Canvas(modifier = Modifier.fillMaxWidth().height(200.dp)) {
+    Canvas(modifier = Modifier.fillMaxWidth().height(200.dp).padding(top = 16.dp)) {
         if (expenses.isEmpty()) return@Canvas
         val maxAmount = expenses.maxOf { it.amount }.toFloat().coerceAtLeast(1f)
-        val stepX = size.width / expenses.size.coerceAtLeast(2).minus(1)
+        val stepX = size.width / (expenses.size - 1).coerceAtLeast(1).toFloat()
         
         val path = Path()
         expenses.forEachIndexed { index, expense ->
@@ -262,44 +262,72 @@ suspend fun exportToPdf(context: Context, originalExpenses: List<Expense>, langu
 
             val document = PdfDocument()
             val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 size
-            val page = document.startPage(pageInfo)
-            val canvas = page.canvas
+            var page = document.startPage(pageInfo)
+            var canvas = page.canvas
             val paint = Paint()
             
             val rsPrefix = if (isHindi) "रु " else "Rs. "
 
-            paint.textSize = 24f
-            paint.isFakeBoldText = true
-            val titleText = if (folderTitle != null) "$folderTitle Report" else if (isHindi) "व्यय रिपोर्ट (ExpenseLog)" else "ExpenseLog Master Report"
-            canvas.drawText(titleText, 40f, 60f, paint)
+            fun drawHeader(): Float {
+                paint.color = android.graphics.Color.BLACK
+                paint.textSize = 24f
+                paint.isFakeBoldText = true
+                val titleText = if (folderTitle != null) "$folderTitle Report" else if (isHindi) "व्यय रिपोर्ट (ExpenseLog)" else "ExpenseLog Master Report"
+                canvas.drawText(titleText, 40f, 60f, paint)
+                
+                paint.textSize = 14f
+                paint.isFakeBoldText = false
+                val dateFormat = java.text.SimpleDateFormat("dd/MM/yyyy hh:mm a", java.util.Locale.getDefault())
+                val generatedOnText = if (isHindi) "बनाने की तिथि: " else "Generated on: "
+                canvas.drawText("${generatedOnText}${dateFormat.format(Date())}", 40f, 90f, paint)
+                
+                paint.textSize = 16f
+                var yPos = 140f
+                
+                canvas.drawText(if (isHindi) "तारीख" else "Date", 40f, yPos, paint)
+                canvas.drawText(if (isHindi) "कारण" else "Reason", 150f, yPos, paint)
+                canvas.drawText(if (isHindi) "मात्रा" else "Qty", 350f, yPos, paint)
+                canvas.drawText(if (isHindi) "रकम" else "Amount", 450f, yPos, paint)
+                
+                yPos += 20f
+                paint.strokeWidth = 1f
+                canvas.drawLine(40f, yPos, 550f, yPos, paint)
+                yPos += 30f
+                return yPos
+            }
             
-            paint.textSize = 14f
-            paint.isFakeBoldText = false
-            val dateFormat = java.text.SimpleDateFormat("dd/MM/yyyy hh:mm a", java.util.Locale.getDefault())
-            val generatedOnText = if (isHindi) "बनाने की तिथि: " else "Generated on: "
-            canvas.drawText("${generatedOnText}${dateFormat.format(Date())}", 40f, 90f, paint)
-            
-            paint.textSize = 16f
-            var yPos = 140f
-            
-            canvas.drawText(if (isHindi) "तारीख" else "Date", 40f, yPos, paint)
-            canvas.drawText(if (isHindi) "कारण" else "Reason", 150f, yPos, paint)
-            canvas.drawText(if (isHindi) "मात्रा" else "Qty", 350f, yPos, paint)
-            canvas.drawText(if (isHindi) "रकम" else "Amount", 450f, yPos, paint)
-            
-            yPos += 20f
-            paint.strokeWidth = 1f
-            canvas.drawLine(40f, yPos, 550f, yPos, paint)
-            yPos += 30f
+            var yPos = drawHeader()
             
             val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
             val itemDateFormat = java.text.SimpleDateFormat("dd/MM/yy", java.util.Locale.getDefault())
             val itemTimeFormat = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
             
             paint.textSize = 14f
+            
+            val textPaint = android.text.TextPaint()
+            textPaint.textSize = 9f
+
             expenses.forEach { expense ->
-                if (yPos > 730f) {
-                    return@forEach
+                var staticLayout: android.text.StaticLayout? = null
+                if (!expense.notes.isNullOrBlank()) {
+                    val notesStr = if (isHindi) "नोट्स: ${expense.notes}" else "Notes: ${expense.notes}"
+                    textPaint.color = android.graphics.Color.DKGRAY
+                    
+                    staticLayout = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                        android.text.StaticLayout.Builder.obtain(notesStr, 0, notesStr.length, textPaint, 400).build()
+                    } else {
+                        @Suppress("DEPRECATION")
+                        android.text.StaticLayout(notesStr, textPaint, 400, android.text.Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false)
+                    }
+                }
+                
+                val itemHeight = 15f + (staticLayout?.height?.toFloat()?.plus(5f) ?: 15f) + 25f
+                
+                if (yPos + itemHeight > 780f) {
+                    document.finishPage(page)
+                    page = document.startPage(pageInfo)
+                    canvas = page.canvas
+                    yPos = drawHeader()
                 }
                 
                 paint.color = android.graphics.Color.BLACK
@@ -324,19 +352,7 @@ suspend fun exportToPdf(context: Context, originalExpenses: List<Expense>, langu
                 paint.textSize = 9f
                 canvas.drawText(timeStr, 40f, yPos, paint)
                 
-                if (!expense.notes.isNullOrBlank()) {
-                    val notesStr = if (isHindi) "नोट्स: ${expense.notes}" else "Notes: ${expense.notes}"
-                    val textPaint = android.text.TextPaint()
-                    textPaint.color = android.graphics.Color.DKGRAY
-                    textPaint.textSize = 9f
-                    
-                    val staticLayout = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                        android.text.StaticLayout.Builder.obtain(notesStr, 0, notesStr.length, textPaint, 400).build()
-                    } else {
-                        @Suppress("DEPRECATION")
-                        android.text.StaticLayout(notesStr, textPaint, 400, android.text.Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false)
-                    }
-                    
+                if (staticLayout != null) {
                     canvas.save()
                     canvas.translate(150f, yPos - 8f)
                     staticLayout.draw(canvas)
@@ -352,6 +368,13 @@ suspend fun exportToPdf(context: Context, originalExpenses: List<Expense>, langu
                 canvas.drawLine(40f, yPos, 550f, yPos, paint)
                 
                 yPos += 25f
+            }
+            
+            if (yPos + 40f > 780f) {
+                document.finishPage(page)
+                page = document.startPage(pageInfo)
+                canvas = page.canvas
+                yPos = drawHeader()
             }
             
             yPos += 10f
